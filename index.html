@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hamster Clicker</title>
+  <style>
+
+    
+    body {
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      background:#2a67a0;
+      background-image: url("images/img.jpg");
+      background-position: center;
+      background-size:cover ;
+      background-repeat:no-repeat;
+      margin: 0;
+      padding-bottom: 80px;
+    }
+    #hamster {
+      max-width: 880px;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    #hamster:active {
+      transform: scale(0.95);
+    }
+    #coins, #level {
+      font-size: 5vw;
+      margin: 10px;
+    }
+    .btn {
+      padding: 10px 20px;
+      font-size: 2vw;
+      margin: 5px;
+      cursor: pointer;
+      background-color: #ae00ff;
+      border: none;
+      border-radius: 35px;
+      max-width: 90%;
+      color: white;
+    }
+    .floating-coin {
+      position: absolute;
+      color: #ff9800;
+      font-size: 20px;
+      animation: floatUp 1s ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes floatUp {
+      0% {
+        opacity: 1;
+        transform: translateY(0px);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-50px);
+      }
+    }
+    @keyframes levelFlash {
+      0% { color: #ff5722; transform: scale(1.2); }
+      100% { color: inherit; transform: scale(1); }
+    }
+    #level.level-up {
+      animation: levelFlash 0.5s ease;
+    }
+    .panel {
+      display: none;
+      margin-top: 20px;
+    }
+    .panel.active {
+      display: block;
+    }
+    .bottom-menu {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #2a67a0;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 0;
+      box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+    .menu-btn {
+      display: block;
+      background: #ae00ff;
+      border: 1px solid black;
+      font-size: 3.5vw;
+      padding: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+   
+
+  <h1 style="font-size: 6vw;">🐹 Hamster Clicker</h1>
+  
+  <div id="coins">Монеты: 0</div>
+  <div id="level">Уровень: 1</div>
+
+  <div id="main" class="panel active">
+    <img id="hamster" src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="Hamster">
+    <div>
+      <button class="btn" onclick="buyUpgrade()">Улучшить (Цена: <span id="upgradeCost">10</span>)</button>
+      <button class="btn" onclick="buyAutoClick()">Прокачать доход (Цена: <span id="autoClickCost">20</span>)</button>
+    </div>
+  </div>
+
+  <div id="shop" class="panel">
+    <div id="skins">
+      <h3>Выбери скин:</h3>
+      <div id="skinList"></div>
+    </div>
+  </div>
+
+  <div id="earn" class="panel">
+    <h2 style="font-size: 5vw;">Задания</h2>
+    <ul style="list-style-type: none; padding: 0;">
+      <li><button class="btn" onclick="completeQuest(10)">Посетить офис (10 монет)</button></li>
+      <li><button class="btn" onclick="completeQuest(25)">Провести митинг (25 монет)</button></li>
+      <li><button class="btn" onclick="completeQuest(50)">Разработать фичу (50 монет)</button></li>
+      <li><button class="btn" onclick="completeQuest(50)">пассивный клик (17 монет)</button></li>
+    </ul>
+  </div>
+
+  <audio id="clickSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_7f00601d54.mp3"></audio>
+
+  <div class="bottom-menu">
+    <button class="menu-btn" onclick="showTab('main')">Проект</button>
+    <button class="menu-btn" onclick="showTab('earn')">Заработать</button>
+    
+    <button class="menu-btn" onclick="showTab('shop')">Магазин</button>
+    <button class="menu-btn" onclick="alert('Ивенты скоро!')">Ивенты</button>
+  </div>
+
+  <script>
+    let coins = parseInt(localStorage.getItem('coins')) || 0;
+    let coinsPerClick = parseInt(localStorage.getItem('coinsPerClick')) || 1;
+    let upgradeCost = parseInt(localStorage.getItem('upgradeCost')) || 10;
+    let autoClickLevel = parseInt(localStorage.getItem('autoClickLevel')) || 0;
+    let autoClickCost = parseInt(localStorage.getItem('autoClickCost')) || 20;
+    let level = parseInt(localStorage.getItem('level')) || 1;
+    let ownedSkins = JSON.parse(localStorage.getItem('ownedSkins')) || ['Обычный'];
+    let currentSkin = localStorage.getItem('currentSkin') || 'Обычный';
+
+    const skins = [
+      { name: 'Обычный', src: 'https://cdn-icons-png.flaticon.com/512/616/616408.png', price: 50 },
+      { name: 'Хакер', src: 'https://cdn-icons-png.flaticon.com/512/4775/4775795.png', price: 50 },
+      { name: 'Котомышь', src: 'https://cdn-icons-png.flaticon.com/512/1998/1998611.png', price: 100 },
+      { name: 'Зерно', src: 'https://cdn-icons-png.flaticon.com/512/1998/1998611.png', price: 100 }
+    ];
+
+    const coinsDisplay = document.getElementById('coins');
+    const levelDisplay = document.getElementById('level');
+    const upgradeCostDisplay = document.getElementById('upgradeCost');
+    const autoClickCostDisplay = document.getElementById('autoClickCost');
+    const hamster = document.getElementById('hamster');
+    const clickSound = document.getElementById('clickSound');
+
+    hamster.addEventListener('click', (e) => {
+      coins += coinsPerClick;
+      showFloatingCoin(e.clientX, e.clientY);
+      updateDisplay();
+      saveProgress();
+      clickSound.play();
+    });
+
+    function buyUpgrade() {
+      if (coins >= upgradeCost) {
+        coins -= upgradeCost;
+        coinsPerClick++;
+        upgradeCost = Math.floor(upgradeCost * 1.5);
+        updateDisplay();
+        saveProgress();
+      } else {
+        alert("Недостаточно монет!");
+      }
+    }
+
+    function buyAutoClick() {
+      if (coins >= autoClickCost) {
+        coins -= autoClickCost;
+        autoClickLevel++;
+        autoClickCost = Math.floor(autoClickCost * 2);
+        updateDisplay();
+        saveProgress();
+      } else {
+        alert("Недостаточно монет!");
+      }
+    }
+
+    function updateDisplay() {
+      coinsDisplay.innerText = `Монеты: ${coins}`;
+      upgradeCostDisplay.innerText = upgradeCost;
+      autoClickCostDisplay.innerText = autoClickCost;
+      const newLevel = Math.floor(coins / 50) + 1;
+      if (newLevel !== level) {
+        level = newLevel;
+        levelDisplay.innerText = `Уровень: ${level}`;
+        levelDisplay.classList.add('level-up');
+        setTimeout(() => levelDisplay.classList.remove('level-up'), 500);
+      } else {
+        levelDisplay.innerText = `Уровень: ${level}`;
+      }
+      loadSkins();
+    }
+
+    function showFloatingCoin(x, y) {
+      const coin = document.createElement('div');
+      coin.classList.add('floating-coin');
+      coin.style.left = `${x}px`;
+      coin.style.top = `${y}px`;
+      coin.innerText = `+${coinsPerClick}`;
+      document.body.appendChild(coin);
+      setTimeout(() => coin.remove(), 1000);
+    }
+
+    function saveProgress() {
+      localStorage.setItem('coins', coins);
+      localStorage.setItem('coinsPerClick', coinsPerClick);
+      localStorage.setItem('upgradeCost', upgradeCost);
+      localStorage.setItem('autoClickLevel', autoClickLevel);
+      localStorage.setItem('autoClickCost', autoClickCost);
+      localStorage.setItem('level', level);
+      localStorage.setItem('activeTab', document.querySelector('.panel.active')?.id || 'main');
+      localStorage.setItem('ownedSkins', JSON.stringify(ownedSkins));
+      localStorage.setItem('currentSkin', currentSkin);
+    }
+
+    function restoreLastTab() {
+      const tabId = localStorage.getItem('activeTab') || 'main';
+      showTab(tabId);
+    }
+
+    function completeQuest(reward) {
+      coins += reward;
+      updateDisplay();
+      saveProgress();
+      alert(`Вы заработали ${reward} монет!`);
+    }
+
+    setInterval(() => {
+      coins += autoClickLevel;
+      updateDisplay();
+      saveProgress();
+    }, 2000);
+
+    function showTab(tabId) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      saveProgress();
+    }
+
+    function loadSkins() {
+      const skinList = document.getElementById('skinList');
+      skinList.innerHTML = '';
+      skins.forEach(skin => {
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <img src="${skin.src}" alt="${skin.name}" width="50">
+          <strong>${skin.name}</strong><br>
+          ${ownedSkins.includes(skin.name)
+            ? `<button onclick="selectSkin('${skin.name}')">Выбрать</button>`
+            : `<button onclick="buySkin('${skin.name}')">Купить (${skin.price} монет)</button>`}
+        `;
+        skinList.appendChild(div);
+      });
+    }
+
+    function buySkin(name) {
+      const skin = skins.find(s => s.name === name);
+      if (!skin || coins < skin.price) {
+        alert('Недостаточно монет или скин не найден!');
+        return;
+      }
+      coins -= skin.price;
+      ownedSkins.push(name);
+      selectSkin(name);
+      updateDisplay();
+      saveProgress();
+      loadSkins();
+    }
+
+    function selectSkin(name) {
+      const skin = skins.find(s => s.name === name);
+      if (!skin) return;
+      currentSkin = name;
+      hamster.src = skin.src;
+      saveProgress();
+    }
+
+    function restoreSkin() {
+      const skin = skins.find(s => s.name === currentSkin);
+      if (skin) hamster.src = skin.src;
+    }
+
+    updateDisplay();
+    restoreLastTab();
+    restoreSkin();
+  </script>
+
+</body>
+</html>
+
+
+
